@@ -1,0 +1,1 @@
+.\.venv\Scripts\Activate.ps1 used to enter testing environment
