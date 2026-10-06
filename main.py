@@ -3,6 +3,7 @@ import asyncio
 from src.stream import load_market_data, stream_market_data
 from src.analytics import MarketAnalytics
 from src.simulation import MonteCarloSimulator
+from src.pricing import PricingEngine
 
 
 async def main():
@@ -11,6 +12,11 @@ async def main():
     analytics = MarketAnalytics(window_size=100)
 
     simulator = MonteCarloSimulator(num_simulations=10_000, num_steps=60)
+
+    pricing_engine = PricingEngine( 
+        base_spread=0.0005,
+        volatility_multiplier=2.0
+    )
 
     print("Starting market data stream...\n")
 
@@ -37,16 +43,21 @@ async def main():
             volatility=volatility
         )
 
+        pricing = pricing_engine.calculate_prices(
+            current_price=tick.price,
+            price_paths=path,
+            volatility=volatility
+        )
+
         results = simulator.summarize(path)
         
         print(
             f"{tick.symbol} | "
             f"Current: ${tick.price:.2f} | "
-            f"Fair: ${results['expected_price']:.2f} | "
-            f"Range: "
-            f"${results['lower_bound']:.2f} - "
-            f"${results['upper_bound']:.2f} | "
-            f"Vol: {volatility:.6f}"
+            f"Fair: ${pricing['fair_price']:.2f} | "
+            f"Bid: ${pricing['bid_price']:.2f} | "
+            f"Ask: ${pricing['ask_price']:.2f} | "
+            f"P(Up): {pricing['probability_up']:.1%}"
         )
 
 
