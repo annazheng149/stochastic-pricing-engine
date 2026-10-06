@@ -5,6 +5,7 @@ from src.analytics import MarketAnalytics
 from src.simulation import MonteCarloSimulator
 from src.pricing import PricingEngine
 from src.risk import RiskEngine, RiskStatus
+from src.forecast_manager import ForecastManager
 
 
 async def main():
@@ -25,8 +26,9 @@ async def main():
         mad_warning=0.50,
         mad_halt=1.00
     )
+    
+    forecast_manager = ForecastManager(horizon_minutes=60)
 
-    previous_prediction = None
 
     print("Starting market data stream...\n")
 
@@ -34,10 +36,14 @@ async def main():
         
         analytics.add_price(tick.price)
 
-        if previous_prediction is not None:
+        due_forecasts = forecast_manager.get_due_forecasts(
+        tick.timestamp
+    )
+
+        for forecast in due_forecasts:
 
             risk_engine.add_prediction_error(
-                predicted_price=previous_prediction,
+                predicted_price=forecast.predicted_price,
                 actual_price=tick.price
             )
 
@@ -81,7 +87,10 @@ async def main():
             volatility=volatility
         )
 
-        previous_prediction = pricing["fair_price"]
+        forecast_manager.add_forecast(
+            timestamp=tick.timestamp,
+            predicted_price=pricing["fair_price"]
+        )
 
         results = simulator.summarize(path)
         
