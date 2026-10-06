@@ -27,3 +27,11 @@ class MarketAnalytics:
             return 0.0
 
         return np.std(returns, ddof = 1)
+
+    def calculate_drift(self):
+        returns = self.calculate_returns()
+
+        if len(returns) == 0:
+            return 0.0
+
+        return np.mean(returns)
