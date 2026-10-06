@@ -4,6 +4,7 @@ from src.stream import load_market_data, stream_market_data
 from src.analytics import MarketAnalytics
 from src.simulation import MonteCarloSimulator
 from src.pricing import PricingEngine
+from src.risk import RiskEngine, RiskStatus
 
 
 async def main():
@@ -18,11 +19,27 @@ async def main():
         volatility_multiplier=2.0
     )
 
+    risk_engine = RiskEngine(
+        volatility_warning=0.001,
+        volatility_halt=0.002,
+        mad_warning=0.50,
+        mad_halt=1.00
+    )
+
+    previous_prediction = None
+
     print("Starting market data stream...\n")
 
     async for tick in stream_market_data(ticks, delay=0.5):
         
         analytics.add_price(tick.price)
+
+        if previous_prediction is not None:
+
+            risk_engine.add_prediction_error(
+                predicted_price=previous_prediction,
+                actual_price=tick.price
+            )
 
         #Wait until there is enough market history
         if len(analytics.prices) < 20:
@@ -37,6 +54,21 @@ async def main():
         volatility = analytics.calculate_volatility()
         drift = analytics.calculate_drift()
 
+        risk_status = risk_engine.check_risk(
+            volatility=volatility
+        )
+
+        if risk_status == RiskStatus.HALTED:
+
+            print(
+                f"{tick.symbol} | "
+                f"${tick.price:.2f} | "
+                f"RISK: HALTED | "
+                f"Circuit breaker triggered"
+            )
+
+            continue
+
         path = simulator.simulate(
             current_price=tick.price,
             drift=drift,
@@ -48,6 +80,8 @@ async def main():
             price_paths=path,
             volatility=volatility
         )
+
+        previous_prediction = pricing["fair_price"]
 
         results = simulator.summarize(path)
         
